@@ -20,6 +20,7 @@
   <h1>JSON Parser</h1>
   <textarea id="input" placeholder="在此貼上 JSON 內容..."></textarea>
   <button id="parseBtn">解析</button>
+  <button id="copyBtn" style="margin-left: 8px; background: #10b981;">複製</button>
   <div id="result"></div>
 
 <script>
@@ -50,6 +51,21 @@
   input.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       btn.click();
+    }
+  });
+
+  // 複製功能
+  const copyBtn = document.getElementById('copyBtn');
+  copyBtn.addEventListener('click', async () => {
+    const text = result.textContent;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      const original = copyBtn.textContent;
+      copyBtn.textContent = '已複製！';
+      setTimeout(() => copyBtn.textContent = original, 1500);
+    } catch (err) {
+      alert('複製失敗：' + err);
     }
   });
 </script>
