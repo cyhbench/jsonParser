@@ -1,74 +1,159 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JSON Parser v0.1.0</title>
-<meta name="version" content="0.1.0">
+<title>JSON Parser v0.2.0</title>
+<meta name="version" content="0.2.0">
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 16px; background: #0f172a; color: #e2e8f0; }
   h1 { font-size: 1.25rem; margin: 0 0 12px; }
+  .toolbar { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   textarea { width: 100%; height: 40vh; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; padding: 12px; font-family: monospace; font-size: 14px; resize: vertical; }
-  button { display: inline-block; margin-top: 12px; padding: 10px 20px; border: none; border-radius: 8px; background: #3b82f6; color: white; font-size: 1rem; cursor: pointer; }
-  button:active { background: #2563eb; }
+  button { display: inline-block; padding: 10px 20px; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+  button:active { opacity: 0.85; }
+  #parseBtn { background: #3b82f6; color: white; }
+  #copyBtn { background: #10b981; color: white; }
+  #minifyBtn { background: #8b5cf6; color: white; }
+  #clearBtn { background: #64748b; color: white; }
   #result { margin-top: 16px; white-space: pre-wrap; word-break: break-all; border-radius: 8px; background: #1e293b; border: 1px solid #334155; padding: 12px; font-family: monospace; font-size: 14px; max-height: 50vh; overflow-y: auto; }
   .error { color: #f87171; border-color: #f87171; }
   .success { color: #86efac; border-color: #22c55e; }
+  .error-hint { color: #fbbf24; font-size: 13px; margin-top: 8px; display: block; }
+  .key   { color: #c084fc; }
+  .str   { color: #86efac; }
+  .num   { color: #f59e0b; }
+  .bool  { color: #38bdf8; }
+  .null  { color: #f87171; }
+  .paren { color: #94a3b8; }
 </style>
 </head>
 <body>
   <h1>JSON Parser</h1>
   <textarea id="input" placeholder="在此貼上 JSON 內容..."></textarea>
-  <button id="parseBtn">解析</button>
-  <button id="copyBtn" style="margin-left: 8px; background: #10b981;">複製</button>
+  <div class="toolbar">
+    <button id="parseBtn">解析格式化</button>
+    <button id="minifyBtn">壓縮一行</button>
+    <button id="copyBtn" style="display:none;">複製結果</button>
+    <button id="clearBtn">清除</button>
+  </div>
   <div id="result"></div>
 
 <script>
-  const input = document.getElementById('input');
-  const result = document.getElementById('result');
-  const btn = document.getElementById('parseBtn');
+const input  = document.getElementById('input');
+const result = document.getElementById('result');
+const parseBtn = document.getElementById('parseBtn');
+const minifyBtn = document.getElementById('minifyBtn');
+const copyBtn   = document.getElementById('copyBtn');
+const clearBtn  = document.getElementById('clearBtn');
 
-  function formatJSON(obj, indent = 2) {
-    return JSON.stringify(obj, null, indent);
+let lastParseOk = false;
+
+function commonHints(msg) {
+  const hints = [];
+  if (msg.includes('Unexpected token') || msg.includes("Unexpected")) {
+    hints.push('可能使用了單引號（JSON 只接受雙引號 "）');
+    hints.push('可能有多餘的逗號（trailing comma）');
+    hints.push('注意是否有缺少的 } 或 ]');
   }
+  if (msg.includes('Unterminated')) {
+    hints.push('字串沒有正確關閉，檢查是否有遺漏的雙引號 "');
+  }
+  return hints;
+}
 
-  btn.addEventListener('click', () => {
-    const txt = input.value.trim();
-    result.className = '';
-    result.textContent = '';
-    if (!txt) return;
-    try {
-      const parsed = JSON.parse(txt);
-      result.textContent = formatJSON(parsed);
-      result.classList.add('success');
-    } catch (e) {
-      result.textContent = '❌ 解析失敗：' + e.message;
-      result.classList.add('error');
-    }
+function showError(e) {
+  result.className = 'error';
+  result.innerHTML = '❌ 解析失敗：' + e.message;
+  commonHints(e.message).forEach(h => {
+    result.innerHTML += '<span class="error-hint">💡 ' + h + '</span>';
   });
+  result.innerHTML += '';
+  lastParseOk = false;
+  copyBtn.style.display = 'none';
+}
 
-  // 支援 Ctrl+Enter 快捷鍵
-  input.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      btn.click();
-    }
-  });
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
-  // 複製功能
-  const copyBtn = document.getElementById('copyBtn');
-  copyBtn.addEventListener('click', async () => {
-    const text = result.textContent;
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      const original = copyBtn.textContent;
-      copyBtn.textContent = '已複製！';
-      setTimeout(() => copyBtn.textContent = original, 1500);
-    } catch (err) {
-      alert('複製失敗：' + err);
+function highlightJSON(jsonStr) {
+  return jsonStr.replace(/("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
+    let cls = 'num';
+    if (/^"/.test(match)) {
+      cls = /:$/.test(match) ? 'key' : 'str';
+    } else if (/true|false/.test(match)) {
+      cls = 'bool';
+    } else if (/null/.test(match)) {
+      cls = 'null';
     }
+    return '<span class="' + cls + '">' + esc(match) + '</span>';
   });
+}
+
+function doParse(mode) {
+  const txt = input.value.trim();
+  result.className = '';
+  result.innerHTML = '';
+  if (!txt) { result.textContent = ''; return false; }
+  try {
+    const parsed = JSON.parse(txt);
+    const jsonStr = mode === 'minify' ? JSON.stringify(parsed) : JSON.stringify(parsed, null, 2);
+    result.innerHTML = highlightJSON(jsonStr);
+    result.classList.add('success');
+    lastParseOk = true;
+    copyBtn.style.display = 'inline-block';
+    return true;
+  } catch (e) {
+    showError(e);
+    return false;
+  }
+}
+
+parseBtn.addEventListener('click', () => doParse('format'));
+minifyBtn.addEventListener('click', () => doParse('minify'));
+
+input.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    doParse('format');
+  }
+});
+
+copyBtn.addEventListener('click', async () => {
+  if (!lastParseOk) return;
+  const txt = result.textContent;
+  if (!txt) return;
+  try {
+    await navigator.clipboard.writeText(txt);
+    const orig = copyBtn.textContent;
+    copyBtn.textContent = '已複製！';
+    setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+  } catch (err) {
+    alert('複製失敗：' + err);
+  }
+});
+
+clearBtn.addEventListener('click', () => {
+  input.value = '';
+  result.className = '';
+  result.innerHTML = '';
+  copyBtn.style.display = 'none';
+  lastParseOk = false;
+  input.focus();
+});
+
+const STORAGE_KEY = 'jsonParser_draft';
+function loadDraft() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) input.value = saved;
+}
+function saveDraft() {
+  localStorage.setItem(STORAGE_KEY, input.value);
+}
+loadDraft();
+input.addEventListener('input', () => { clearTimeout(saveDraft._t); saveDraft._t = setTimeout(saveDraft, 300); });
 </script>
 </body>
 </html>
