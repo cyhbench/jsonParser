@@ -26,12 +26,13 @@ git push origin main
 
 ## 版本
 
-目前版本：**v0.2.0**
+目前版本：**v0.3.0**
 
 ## Changelog
 
 | 版本 | 日期 | 異動 |
 |------|------|------|
+| v0.3.0 | 2026-04-01 | 修復 XSS（e.message 改用 esc() 跳脫）、移除無效 innerHTML+=''、localStorage 加 QuotaExceededError 保護、saveDraft debounce 改用外部 timer 變數、textarea 加 autocorrect/autocapitalize/spellcheck 屬性 |
 | v0.2.0 | 2026-04-01 | 加語法高亮、壓縮按鈕、錯誤提示、localStorage、修復複製 bug |
 | v0.1.0 | 2026-03-22 | 初始版本（格式化解折 + 複製 + Ctrl+Enter） |
 

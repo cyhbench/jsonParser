@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JSON Parser v0.2.0</title>
-<meta name="version" content="0.2.0">
+<title>JSON Parser v0.3.0</title>
+<meta name="version" content="0.3.0">
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 16px; background: #0f172a; color: #e2e8f0; }
@@ -31,8 +31,9 @@
 </style>
 </head>
 <body>
-  <h1>JSON Parser <span class="badge">v0.2.0</span></h1>
-  <textarea id="input" placeholder="在此貼上 JSON 內容..."></textarea>
+  <h1>JSON Parser <span class="badge">v0.3.0</span></h1>
+  <textarea id="input" placeholder="在此貼上 JSON 內容..."
+    autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
   <div class="toolbar">
     <button id="parseBtn">解析格式化</button>
     <button id="minifyBtn">壓縮一行</button>
@@ -64,23 +65,22 @@ function commonHints(msg) {
   return hints;
 }
 
-function showError(e) {
-  result.className = 'error';
-  result.innerHTML = '❌ 解析失敗：' + e.message;
-  commonHints(e.message).forEach(h => {
-    result.innerHTML += '<span class="error-hint">💡 ' + h + '</span>';
-  });
-  result.innerHTML += '';
-  lastParseOk = false;
-  copyBtn.style.display = 'none';
-}
-
 function esc(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function showError(e) {
+  result.className = 'error';
+  result.innerHTML = '❌ 解析失敗：' + esc(e.message);
+  commonHints(e.message).forEach(h => {
+    result.innerHTML += '<span class="error-hint">💡 ' + h + '</span>';
+  });
+  lastParseOk = false;
+  copyBtn.style.display = 'none';
+}
+
 function highlightJSON(jsonStr) {
-  return jsonStr.replace(/("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
+  return jsonStr.replace(/("(\u[\da-fA-F]{4}|\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
     let cls = 'num';
     if (/^"/.test(match)) {
       cls = /:$/.test(match) ? 'key' : 'str';
@@ -151,10 +151,18 @@ function loadDraft() {
   if (saved) input.value = saved;
 }
 function saveDraft() {
-  localStorage.setItem(STORAGE_KEY, input.value);
+  try {
+    localStorage.setItem(STORAGE_KEY, input.value);
+  } catch (e) {
+    // QuotaExceededError — 超出 localStorage 限制時靜默忽略
+  }
 }
+let saveDraftTimer;
 loadDraft();
-input.addEventListener('input', () => { clearTimeout(saveDraft._t); saveDraft._t = setTimeout(saveDraft, 300); });
+input.addEventListener('input', () => {
+  clearTimeout(saveDraftTimer);
+  saveDraftTimer = setTimeout(saveDraft, 300);
+});
 </script>
 </body>
 </html>
